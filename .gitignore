@@ -1,0 +1,26 @@
+# deps / package manager
+node_modules/
+.pnpm-store/
+
+# env
+.env
+.env.*
+!.env.example
+
+# build / cache
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# prisma / local db
+*.db
+*.db-journal
+
+# logs / coverage
+*.log
+coverage/
+
+# OS / IDE
+.DS_Store
+.idea/
