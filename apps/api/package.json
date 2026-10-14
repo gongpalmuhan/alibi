@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "db:seed": "tsx prisma/seed.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
