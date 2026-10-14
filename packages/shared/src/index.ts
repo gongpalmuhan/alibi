@@ -9,6 +9,13 @@ export {
   VictimSchema,
 } from "./schema";
 
+export {
+  assertValidScenarioTimeline,
+  validateScenarioTimeline,
+} from "./timeline";
+
+export type { CrimeScene, TimelineValidationIssue } from "./timeline";
+
 export type {
   Character,
   Clue,
