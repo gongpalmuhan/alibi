@@ -15,8 +15,8 @@ export const PlayerCountSchema = z.union([z.literal(4), z.literal(5), z.literal(
 
 export const VictimSchema = z.object({
   name: NonEmptyStringSchema,
-  occupation: NonEmptyStringSchema,
   description: NonEmptyStringSchema,
+  deathDescription: NonEmptyStringSchema,
 });
 
 export const CharacterSchema = z.object({
