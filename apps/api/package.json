@@ -2,6 +2,10 @@
   "name": "@alibi/api",
   "private": true,
   "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@alibi/shared": "workspace:*",
     "@prisma/adapter-neon": "^7.10.0",
