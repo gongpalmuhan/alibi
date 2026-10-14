@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Phase {
+  lobby
+  reading
+  investigation
+  discussion
+  voting
+  reveal
+}
+
+enum GenerationStatus {
+  pending
+  generating
+  ready
+  failed
+}
+
+model Room {
+  id               String           @id @default(cuid())
+  code             String           @unique
+  theme            String
+  playerCount      Int
+  phase            Phase            @default(lobby)
+  scenarioId       String?
+  generationStatus GenerationStatus @default(pending)
+  generationStep   String?
+  generationError  String?
+  hostTokenHash    String
+  createdAt        DateTime         @default(now())
+
+  scenario Scenario? @relation(fields: [scenarioId], references: [id])
+  players  Player[]
+  votes    Vote[]
+}
+
+model Player {
+  id               String   @id @default(cuid())
+  roomId           String
+  nickname         String
+  characterId      String?
+  sessionTokenHash String   @unique
+  joinedAt         DateTime @default(now())
+
+  room  Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  votes Vote[]
+}
+
+model Scenario {
+  id          String   @id @default(cuid())
+  theme       String
+  playerCount Int
+  data        Json
+  createdAt   DateTime @default(now())
+
+  rooms Room[]
+}
+
+model Vote {
+  id                String   @id @default(cuid())
+  roomId            String
+  voterId           String
+  targetCharacterId String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  room  Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  voter Player @relation(fields: [voterId], references: [id])
+
+  @@unique([roomId, voterId])
+}
