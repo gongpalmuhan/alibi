@@ -1,5 +1,8 @@
 export {
+  CastVoteInputSchema,
+  CastVoteResponseSchema,
   CharacterSchema,
+  ChangePhaseInputSchema,
   ClueSchema,
   CreateRoomInputSchema,
   JoinRoomInputSchema,
@@ -7,9 +10,16 @@ export {
   PhaseSchema,
   PlayerCountSchema,
   RoomCodeSchema,
+  RoomSnapshotPlayerSchema,
+  RoomSnapshotSchema,
+  RedactedCharacterSchema,
+  RedactedClueSchema,
+  RedactedScenarioSchema,
   ScenarioSchema,
   TimelineEntrySchema,
   TruthSchema,
+  VoteProgressSchema,
+  VoteResultSchema,
   VictimSchema,
 } from "./schema";
 
@@ -21,7 +31,10 @@ export {
 export type { CrimeScene, TimelineValidationIssue } from "./timeline";
 
 export type {
+  CastVoteInput,
+  CastVoteResponse,
   Character,
+  ChangePhaseInput,
   Clue,
   CreateRoomInput,
   JoinRoomInput,
@@ -29,8 +42,15 @@ export type {
   Phase,
   PlayerCount,
   RoomCode,
+  RoomSnapshot,
+  RoomSnapshotPlayer,
+  RedactedCharacter,
+  RedactedClue,
+  RedactedScenario,
   Scenario,
   TimelineEntry,
   Truth,
+  VoteProgress,
+  VoteResult,
   Victim,
 } from "./types";

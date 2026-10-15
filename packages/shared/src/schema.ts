@@ -32,6 +32,18 @@ export const JoinRoomInputSchema = z
   })
   .strict();
 
+export const ChangePhaseInputSchema = z
+  .object({
+    phase: PhaseSchema,
+  })
+  .strict();
+
+export const CastVoteInputSchema = z
+  .object({
+    targetCharacterId: NonEmptyStringSchema,
+  })
+  .strict();
+
 export const VictimSchema = z.object({
   name: NonEmptyStringSchema,
   description: NonEmptyStringSchema,
@@ -152,3 +164,68 @@ export const ScenarioSchema = z
       });
     });
   });
+
+export const RedactedCharacterSchema = z.object({
+  id: NonEmptyStringSchema,
+  name: NonEmptyStringSchema,
+  occupation: NonEmptyStringSchema,
+  publicProfile: NonEmptyStringSchema,
+  privateScript: NonEmptyStringSchema.optional(),
+  secret: NonEmptyStringSchema.optional(),
+  objectives: z.array(NonEmptyStringSchema).min(1).optional(),
+});
+
+export const RedactedClueSchema = z.object({
+  id: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+  content: NonEmptyStringSchema,
+  revealPhase: PhaseSchema,
+});
+
+export const RedactedScenarioSchema = z.object({
+  id: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+  theme: NonEmptyStringSchema,
+  playerCount: PlayerCountSchema,
+  intro: NonEmptyStringSchema,
+  victim: VictimSchema,
+  characters: z.array(RedactedCharacterSchema),
+  clues: z.array(RedactedClueSchema),
+  truth: TruthSchema.optional(),
+});
+
+export const RoomSnapshotPlayerSchema = z.object({
+  id: NonEmptyStringSchema,
+  nickname: NicknameSchema,
+  characterId: NonEmptyStringSchema.nullable(),
+  hasVoted: z.boolean(),
+});
+
+export const VoteProgressSchema = z.object({
+  submittedCount: z.number().int().nonnegative(),
+  totalCount: z.number().int().nonnegative(),
+});
+
+export const VoteResultSchema = z.object({
+  characterId: NonEmptyStringSchema,
+  voteCount: z.number().int().nonnegative(),
+});
+
+export const RoomSnapshotSchema = z.object({
+  code: RoomCodeSchema,
+  theme: NonEmptyStringSchema,
+  playerCount: PlayerCountSchema,
+  joinedPlayerCount: z.number().int().nonnegative(),
+  phase: PhaseSchema,
+  generationStatus: z.string(),
+  scenario: RedactedScenarioSchema,
+  me: RoomSnapshotPlayerSchema.optional(),
+  isHost: z.literal(true).optional(),
+  voteProgress: VoteProgressSchema.optional(),
+  voteResults: z.array(VoteResultSchema).optional(),
+});
+
+export const CastVoteResponseSchema = z.object({
+  targetCharacterId: NonEmptyStringSchema,
+  hasVoted: z.literal(true),
+});
