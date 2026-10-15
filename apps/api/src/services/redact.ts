@@ -1,32 +1,12 @@
 import type {
-  Character,
-  Clue,
   Phase,
+  RedactedCharacter,
+  RedactedScenario,
   Scenario,
-  Truth,
 } from "../../../../packages/shared/src";
 
 type RequestingPlayer = {
   characterId: string | null;
-};
-
-type RedactedCharacter = Pick<
-  Character,
-  "id" | "name" | "occupation" | "publicProfile"
-> &
-  Partial<
-    Pick<Character, "privateScript" | "secret" | "objectives">
-  >;
-
-type RedactedClue = Omit<Clue, "pointsTo">;
-
-export type RedactedScenario = Omit<
-  Scenario,
-  "characters" | "clues" | "truth"
-> & {
-  characters: RedactedCharacter[];
-  clues: RedactedClue[];
-  truth?: Truth;
 };
 
 const phaseOrder: Record<Phase, number> = {
