@@ -13,6 +13,25 @@ export const PhaseSchema = z.enum([
 
 export const PlayerCountSchema = z.union([z.literal(4), z.literal(5), z.literal(6)]);
 
+export const RoomCodeSchema = z
+  .string()
+  .regex(/^[A-Z0-9]{6}$/, "Room code must be six uppercase letters or digits.");
+
+export const NicknameSchema = z.string().trim().min(1).max(40);
+
+export const CreateRoomInputSchema = z
+  .object({
+    theme: NonEmptyStringSchema,
+    playerCount: PlayerCountSchema,
+  })
+  .strict();
+
+export const JoinRoomInputSchema = z
+  .object({
+    nickname: NicknameSchema,
+  })
+  .strict();
+
 export const VictimSchema = z.object({
   name: NonEmptyStringSchema,
   description: NonEmptyStringSchema,
