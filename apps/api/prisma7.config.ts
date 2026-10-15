@@ -8,9 +8,7 @@ const apiDirectory = dirname(fileURLToPath(import.meta.url));
 config({
   path: [
     resolve(apiDirectory, "../../.env.local"),
-    resolve(apiDirectory, ".env.local"),
     resolve(apiDirectory, "../../.env"),
-    resolve(apiDirectory, ".env"),
   ],
 });
 
