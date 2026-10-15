@@ -39,7 +39,8 @@ const main = async () => {
     return scenario;
   });
 
-  const { prisma } = await import("../src/lib/prisma");
+  const { getPrisma } = await import("../src/lib/prisma");
+  const prisma = getPrisma();
 
   try {
     for (const scenario of scenarios) {

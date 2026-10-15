@@ -1,17 +1,6 @@
 import { PrismaNeon } from "@prisma/adapter-neon";
-import { config } from "dotenv";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { PrismaClient } from "../../generated/prisma/client";
-
-const apiDirectory = dirname(fileURLToPath(import.meta.url));
-
-config({
-  path: [
-    resolve(apiDirectory, "../../../../.env.local"),
-    resolve(apiDirectory, "../../../../.env"),
-  ],
-});
+import "./env";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -29,8 +18,17 @@ const createPrismaClient = () => {
   return new PrismaClient({ adapter });
 };
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+export const getPrisma = (): PrismaClient => {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient();
+  }
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+  return globalForPrisma.prisma;
+};
+
+export const disconnectPrisma = async (): Promise<void> => {
+  if (globalForPrisma.prisma) {
+    await globalForPrisma.prisma.$disconnect();
+    globalForPrisma.prisma = undefined;
+  }
+};
