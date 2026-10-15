@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "db:seed": "tsx prisma/seed.ts",
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
