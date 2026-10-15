@@ -1,4 +1,6 @@
 import {
+  CastVoteInputSchema,
+  ChangePhaseInputSchema,
   CreateRoomInputSchema,
   JoinRoomInputSchema,
   RoomCodeSchema,
@@ -6,7 +8,14 @@ import {
 import { Router } from "express";
 
 import { ApiError } from "../lib/errors";
-import { createRoom, getRoomSnapshot, joinRoom } from "../services/room";
+import {
+  assignCharacters,
+  castVote,
+  changeRoomPhase,
+  createRoom,
+  getRoomSnapshot,
+  joinRoom,
+} from "../services/room";
 
 const roomsRouter = Router();
 
@@ -50,6 +59,24 @@ const optionalHostTokenFrom = (hostToken: string | undefined): string | undefine
   return hostToken;
 };
 
+const requiredPlayerTokenFrom = (authorization: string | undefined): string => {
+  const playerToken = optionalPlayerTokenFrom(authorization);
+  if (!playerToken) {
+    throw new ApiError(401, "UNAUTHORIZED", "Player token is required.");
+  }
+
+  return playerToken;
+};
+
+const requiredHostTokenFrom = (hostToken: string | undefined): string => {
+  const token = optionalHostTokenFrom(hostToken);
+  if (!token) {
+    throw new ApiError(401, "UNAUTHORIZED", "Host token is required.");
+  }
+
+  return token;
+};
+
 roomsRouter.post("/", async (request, response, next) => {
   try {
     const input = parseOrThrow(CreateRoomInputSchema.safeParse(request.body));
@@ -68,6 +95,54 @@ roomsRouter.post("/:code/players", async (request, response, next) => {
     const result = await joinRoom(code, input);
 
     response.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+roomsRouter.post("/:code/assignments", async (request, response, next) => {
+  try {
+    const code = roomCodeFrom(request.params.code);
+    const snapshot = await assignCharacters(
+      code,
+      requiredHostTokenFrom(request.get("x-host-token") ?? undefined),
+      optionalPlayerTokenFrom(request.get("authorization") ?? undefined),
+    );
+
+    response.json(snapshot);
+  } catch (error) {
+    next(error);
+  }
+});
+
+roomsRouter.patch("/:code/phase", async (request, response, next) => {
+  try {
+    const code = roomCodeFrom(request.params.code);
+    const input = parseOrThrow(ChangePhaseInputSchema.safeParse(request.body));
+    const snapshot = await changeRoomPhase(
+      code,
+      input,
+      requiredHostTokenFrom(request.get("x-host-token") ?? undefined),
+      optionalPlayerTokenFrom(request.get("authorization") ?? undefined),
+    );
+
+    response.json(snapshot);
+  } catch (error) {
+    next(error);
+  }
+});
+
+roomsRouter.put("/:code/vote", async (request, response, next) => {
+  try {
+    const code = roomCodeFrom(request.params.code);
+    const input = parseOrThrow(CastVoteInputSchema.safeParse(request.body));
+    const vote = await castVote(
+      code,
+      input,
+      requiredPlayerTokenFrom(request.get("authorization") ?? undefined),
+    );
+
+    response.json(vote);
   } catch (error) {
     next(error);
   }
