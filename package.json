@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "pnpm@10.23.0",
   "scripts": {
-    "build": "pnpm --filter @alibi/shared run typecheck && pnpm --filter @alibi/api run typecheck"
+    "build": "pnpm --filter @alibi/shared run typecheck && pnpm --filter @alibi/api run typecheck",
+    "test": "pnpm --filter @alibi/api run test"
   },
   "dependencies": {
     "@neon/config": "^1.9.1",
