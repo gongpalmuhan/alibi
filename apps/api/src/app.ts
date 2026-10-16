@@ -4,6 +4,7 @@ import express from "express";
 import { clientOrigin } from "./lib/env";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 import { roomsRouter } from "./routes/rooms";
+import { scenariosRouter } from "./routes/scenarios";
 
 export const app = express();
 
@@ -16,5 +17,6 @@ app.get("/health", (_request, response) => {
 });
 
 app.use("/api/rooms", roomsRouter);
+app.use("/api/scenarios", scenariosRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
