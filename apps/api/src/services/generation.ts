@@ -480,16 +480,12 @@ export const selectFallbackScenario = async (
         generationStatus: true,
         hostTokenHash: true,
         _count: { select: { players: true } },
-        generationAttempts: {
-          where: { status: "queued" },
-          select: { id: true, reservedNanoUsd: true, createdAt: true },
-        },
       },
     });
     if (!room) throw new ApiError(404, "NOT_FOUND", "Room not found.");
     assertHost(room.hostTokenHash, hostToken);
-    if (room.generationStatus !== "failed" && !(room.generationStatus === "queued" && room._count.players === 0)) {
-      throw new ApiError(409, "GENERATION_NOT_FAILED", "Fallback is only available for failed or empty queued rooms.");
+    if (room.generationStatus !== "failed") {
+      throw new ApiError(409, "GENERATION_NOT_FAILED", "Fallback is only available after generation fails.");
     }
     const storedScenario = await transaction.scenario.findUnique({
       where: { id: input.scenarioId },
@@ -501,17 +497,6 @@ export const selectFallbackScenario = async (
     if (!scenario.success) throw new ApiError(500, "INTERNAL_ERROR", "Stored scenario is invalid.");
     if (scenario.data.playerCount !== room.playerCount) {
       throw new ApiError(409, "SCENARIO_PLAYER_COUNT_MISMATCH", "Scenario player count does not match the room.");
-    }
-    for (const queuedAttempt of room.generationAttempts) {
-      const day = startOfUtcDay(queuedAttempt.createdAt);
-      await transaction.generationBudget.update({
-        where: { date: day },
-        data: { reservedNanoUsd: { decrement: queuedAttempt.reservedNanoUsd } },
-      });
-      await transaction.generationAttempt.update({
-        where: { id: queuedAttempt.id },
-        data: { status: "failed", errorCode: "FALLBACK_SELECTED", actualNanoUsd: 0n, completedAt: new Date() },
-      });
     }
     const activatedFallback = await transaction.room.updateMany({
       // Do not race an in-process worker that has already changed queued -> generating.
