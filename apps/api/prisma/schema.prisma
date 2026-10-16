@@ -17,10 +17,15 @@ enum Phase {
 }
 
 enum GenerationStatus {
-  pending
+  queued
   generating
   ready
   failed
+}
+
+enum ScenarioSource {
+  PRESET
+  GENERATED
 }
 
 model Room {
@@ -30,7 +35,7 @@ model Room {
   playerCount      Int
   phase            Phase            @default(lobby)
   scenarioId       String?
-  generationStatus GenerationStatus @default(pending)
+  generationStatus GenerationStatus @default(queued)
   generationStep   String?
   generationError  String?
   hostTokenHash    String
@@ -39,6 +44,7 @@ model Room {
   scenario Scenario? @relation(fields: [scenarioId], references: [id])
   players  Player[]
   votes    Vote[]
+  generationAttempts GenerationAttempt[]
 }
 
 model Player {
@@ -58,9 +64,40 @@ model Scenario {
   theme       String
   playerCount Int
   data        Json
+  source      ScenarioSource @default(PRESET)
   createdAt   DateTime @default(now())
 
-  rooms Room[]
+  rooms              Room[]
+  generationAttempts GenerationAttempt[]
+}
+
+model GenerationAttempt {
+  id               String           @id @default(cuid())
+  roomId           String
+  scenarioId       String?
+  status           GenerationStatus @default(queued)
+  step             String?
+  model            String
+  reservedNanoUsd  BigInt
+  actualNanoUsd    BigInt?
+  inputTokens      Int?
+  cachedInputTokens Int?
+  outputTokens     Int?
+  errorCode        String?
+  createdAt        DateTime         @default(now())
+  completedAt      DateTime?
+
+  room     Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  scenario Scenario? @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+
+  @@index([roomId, createdAt])
+}
+
+model GenerationBudget {
+  /// UTC calendar day, normalized to midnight.
+  date             DateTime @id
+  reservedNanoUsd  BigInt   @default(0)
+  spentNanoUsd     BigInt   @default(0)
 }
 
 model Vote {

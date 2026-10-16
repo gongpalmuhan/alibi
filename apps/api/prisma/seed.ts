@@ -51,11 +51,13 @@ const main = async () => {
           theme: scenario.theme,
           playerCount: scenario.playerCount,
           data: scenario,
+          source: "PRESET",
         },
         update: {
           theme: scenario.theme,
           playerCount: scenario.playerCount,
           data: scenario,
+          source: "PRESET",
         },
       });
 
