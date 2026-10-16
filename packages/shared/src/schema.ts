@@ -13,6 +13,26 @@ export const PhaseSchema = z.enum([
 
 export const PlayerCountSchema = z.union([z.literal(4), z.literal(5), z.literal(6)]);
 
+export const ScenarioSourceSchema = z.enum(["PRESET", "GENERATED"]);
+
+export const GenerationStatusSchema = z.enum([
+  "queued",
+  "generating",
+  "ready",
+  "failed",
+]);
+
+export const GenerationStepSchema = z
+  .enum([
+    "truth",
+    "characters",
+    "timeline",
+    "scripts",
+    "clues",
+    "verification",
+  ])
+  .nullable();
+
 export const RoomCodeSchema = z
   .string()
   .regex(/^[A-Z0-9]{6}$/, "Room code must be six uppercase letters or digits.");
@@ -23,6 +43,26 @@ export const CreateRoomInputSchema = z
   .object({
     theme: NonEmptyStringSchema,
     playerCount: PlayerCountSchema,
+  })
+  .strict();
+
+/** Creates a lobby from a previously validated, stored scenario. */
+export const CreateRoomFromScenarioInputSchema = z
+  .object({
+    scenarioId: NonEmptyStringSchema,
+  })
+  .strict();
+
+export const GenerateRoomInputSchema = z
+  .object({
+    theme: NonEmptyStringSchema.max(120),
+    playerCount: PlayerCountSchema,
+  })
+  .strict();
+
+export const SelectRoomScenarioInputSchema = z
+  .object({
+    scenarioId: NonEmptyStringSchema,
   })
   .strict();
 
@@ -194,6 +234,22 @@ export const RedactedScenarioSchema = z.object({
   truth: TruthSchema.optional(),
 });
 
+export const ScenarioLibraryItemSchema = z.object({
+  id: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
+  theme: NonEmptyStringSchema,
+  playerCount: PlayerCountSchema,
+  intro: NonEmptyStringSchema,
+  source: ScenarioSourceSchema,
+  createdAt: z.string().datetime(),
+});
+
+export const RoomGenerationSchema = z.object({
+  status: GenerationStatusSchema,
+  step: GenerationStepSchema,
+  errorCode: z.string().nullable(),
+});
+
 export const RoomSnapshotPlayerSchema = z.object({
   id: NonEmptyStringSchema,
   nickname: NicknameSchema,
@@ -217,8 +273,10 @@ export const RoomSnapshotSchema = z.object({
   playerCount: PlayerCountSchema,
   joinedPlayerCount: z.number().int().nonnegative(),
   phase: PhaseSchema,
-  generationStatus: z.string(),
-  scenario: RedactedScenarioSchema,
+  // Retained for existing clients. New clients should use `generation`.
+  generationStatus: GenerationStatusSchema,
+  generation: RoomGenerationSchema,
+  scenario: RedactedScenarioSchema.optional(),
   me: RoomSnapshotPlayerSchema.optional(),
   isHost: z.literal(true).optional(),
   voteProgress: VoteProgressSchema.optional(),

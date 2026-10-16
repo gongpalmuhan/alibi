@@ -1,5 +1,6 @@
 import {
   ScenarioSchema,
+  GenerationStepSchema,
   type CastVoteInput,
   type CastVoteResponse,
   type ChangePhaseInput,
@@ -9,6 +10,7 @@ import {
   type RoomSnapshot,
   type RoomSnapshotPlayer,
   type Scenario,
+  type ScenarioLibraryItem,
   type VoteProgress,
   type VoteResult,
 } from "../../../../packages/shared/src";
@@ -25,6 +27,8 @@ type SnapshotRoom = Pick<
   "code" | "theme" | "phase" | "generationStatus"
 > & {
   playerCount: number;
+  generationStep?: string | null;
+  generationError?: string | null;
 };
 
 type GetRoomOptions = {
@@ -54,7 +58,7 @@ const parseStoredScenario = (data: unknown): Scenario => {
 
 const toSnapshot = (
   room: SnapshotRoom,
-  scenario: Scenario,
+  scenario: Scenario | null,
   joinedPlayerCount: number,
   player: RoomSnapshotPlayer | null,
   isHost: boolean,
@@ -63,11 +67,16 @@ const toSnapshot = (
 ): RoomSnapshot => ({
   code: room.code,
   theme: room.theme,
-  playerCount: scenario.playerCount,
+  playerCount: room.playerCount as 4 | 5 | 6,
   joinedPlayerCount,
   phase: room.phase,
   generationStatus: room.generationStatus,
-  scenario: redactScenarioFor(scenario, room.phase, player),
+  generation: {
+    status: room.generationStatus,
+    step: GenerationStepSchema.safeParse(room.generationStep ?? null).data ?? null,
+    errorCode: room.generationError ?? null,
+  },
+  ...(scenario ? { scenario: redactScenarioFor(scenario, room.phase, player) } : {}),
   ...(player ? { me: player } : {}),
   ...(isHost ? { isHost: true } : {}),
   ...(voteProgress ? { voteProgress } : {}),
@@ -191,6 +200,8 @@ export const createRoom = async (
           playerCount: scenario.playerCount,
           phase: "lobby",
           generationStatus: "ready",
+          generationStep: null,
+          generationError: null,
           hostTokenHash,
           scenario: {
             connect: { id: storedScenario.id },
@@ -202,6 +213,8 @@ export const createRoom = async (
           playerCount: true,
           phase: true,
           generationStatus: true,
+          generationStep: true,
+          generationError: true,
         },
       });
 
@@ -219,6 +232,81 @@ export const createRoom = async (
   }
 
   throw new ApiError(500, "INTERNAL_ERROR", "Unable to allocate a room code.");
+};
+
+/** Creates a room from an immutable stored scenario, never request-supplied metadata. */
+export const createRoomFromScenario = async (
+  scenarioId: string,
+): Promise<{ room: RoomSnapshot; hostToken: string }> => {
+  const prisma = getPrisma();
+  const storedScenario = await prisma.scenario.findUnique({
+    where: { id: scenarioId },
+    select: { id: true, data: true },
+  });
+  if (!storedScenario) {
+    throw new ApiError(404, "NOT_FOUND", "Scenario not found.");
+  }
+
+  const scenario = parseStoredScenario(storedScenario.data);
+  const hostToken = createToken();
+  const hostTokenHash = hashToken(hostToken);
+  for (let attempt = 0; attempt < CODE_GENERATION_ATTEMPTS; attempt += 1) {
+    try {
+      const room = await prisma.room.create({
+        data: {
+          code: createRoomCode(),
+          theme: scenario.theme,
+          playerCount: scenario.playerCount,
+          phase: "lobby",
+          generationStatus: "ready",
+          generationStep: null,
+          generationError: null,
+          hostTokenHash,
+          scenario: { connect: { id: storedScenario.id } },
+        },
+        select: {
+          code: true,
+          theme: true,
+          playerCount: true,
+          phase: true,
+          generationStatus: true,
+          generationStep: true,
+          generationError: true,
+        },
+      });
+      return { room: toSnapshot(room, scenario, 0, null, true), hostToken };
+    } catch (error) {
+      if (isPrismaCode(error, "P2002")) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new ApiError(500, "INTERNAL_ERROR", "Unable to allocate a room code.");
+};
+
+export const listScenarios = async (
+  playerCount?: 4 | 5 | 6,
+): Promise<ScenarioLibraryItem[]> => {
+  const prisma = getPrisma();
+  const scenarios = await prisma.scenario.findMany({
+    where: playerCount ? { playerCount } : undefined,
+    select: { id: true, data: true, source: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return scenarios.map((storedScenario) => {
+    const scenario = parseStoredScenario(storedScenario.data);
+    return {
+      id: storedScenario.id,
+      title: scenario.title,
+      theme: scenario.theme,
+      playerCount: scenario.playerCount,
+      intro: scenario.intro,
+      source: storedScenario.source,
+      createdAt: storedScenario.createdAt.toISOString(),
+    };
+  });
 };
 
 export const joinRoom = async (
@@ -242,6 +330,8 @@ export const joinRoom = async (
               playerCount: true,
               phase: true,
               generationStatus: true,
+              generationStep: true,
+              generationError: true,
               scenario: { select: { data: true } },
             },
           });
@@ -258,16 +348,20 @@ export const joinRoom = async (
             );
           }
 
+          if (room.generationStatus !== "ready" || !room.scenario) {
+            throw new ApiError(
+              409,
+              "SCENARIO_NOT_READY",
+              "This room's scenario is not ready yet.",
+            );
+          }
+
           const joinedPlayerCount = await transaction.player.count({
             where: { roomId: room.id },
           });
 
           if (joinedPlayerCount >= room.playerCount) {
             throw new ApiError(409, "ROOM_FULL", "Room is full.");
-          }
-
-          if (!room.scenario) {
-            throw new ApiError(500, "INTERNAL_ERROR", "Room scenario is missing.");
           }
 
           const scenario = parseStoredScenario(room.scenario.data);
@@ -333,6 +427,8 @@ export const assignCharacters = async (
           playerCount: true,
           phase: true,
           generationStatus: true,
+          generationStep: true,
+          generationError: true,
           hostTokenHash: true,
           scenario: { select: { data: true } },
         },
@@ -352,8 +448,8 @@ export const assignCharacters = async (
         );
       }
 
-      if (!room.scenario) {
-        throw new ApiError(500, "INTERNAL_ERROR", "Room scenario is missing.");
+      if (room.generationStatus !== "ready" || !room.scenario) {
+        throw new ApiError(409, "SCENARIO_NOT_READY", "This room's scenario is not ready yet.");
       }
 
       const scenario = parseStoredScenario(room.scenario.data);
@@ -438,6 +534,8 @@ export const changeRoomPhase = async (
           playerCount: true,
           phase: true,
           generationStatus: true,
+          generationStep: true,
+          generationError: true,
           hostTokenHash: true,
           scenario: { select: { data: true } },
         },
@@ -457,8 +555,8 @@ export const changeRoomPhase = async (
         );
       }
 
-      if (!room.scenario) {
-        throw new ApiError(500, "INTERNAL_ERROR", "Room scenario is missing.");
+      if (room.generationStatus !== "ready" || !room.scenario) {
+        throw new ApiError(409, "SCENARIO_NOT_READY", "This room's scenario is not ready yet.");
       }
 
       const scenario = parseStoredScenario(room.scenario.data);
@@ -505,6 +603,8 @@ export const changeRoomPhase = async (
           playerCount: true,
           phase: true,
           generationStatus: true,
+          generationStep: true,
+          generationError: true,
         },
       });
 
@@ -686,6 +786,8 @@ export const getRoomSnapshot = async (
       playerCount: true,
       phase: true,
       generationStatus: true,
+      generationStep: true,
+      generationError: true,
       hostTokenHash: true,
       scenario: { select: { data: true } },
       _count: { select: { players: true } },
@@ -727,8 +829,8 @@ export const getRoomSnapshot = async (
     throw new ApiError(401, "UNAUTHORIZED", "Host token is invalid.");
   }
 
-  if (!room.scenario) {
-    throw new ApiError(500, "INTERNAL_ERROR", "Room scenario is missing.");
+  if (!room.scenario || room.generationStatus !== "ready") {
+    return toSnapshot(room, null, room._count.players, player, isHost);
   }
 
   const scenario = parseStoredScenario(room.scenario.data);
