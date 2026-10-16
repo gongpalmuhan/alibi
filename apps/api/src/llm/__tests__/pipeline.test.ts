@@ -26,6 +26,7 @@ type ProviderOptions = {
 
 class FixtureProvider implements LlmProvider {
   readonly calls: string[] = [];
+  readonly prompts: string[] = [];
   private timelineAttempts = 0;
 
   constructor(private readonly options: ProviderOptions = {}) {}
@@ -34,6 +35,7 @@ class FixtureProvider implements LlmProvider {
     input: GenerateStructuredInput<T>,
   ): Promise<StructuredGeneration<T>> {
     this.calls.push(input.step);
+    this.prompts.push(input.prompt);
     const data = this.fixtureFor(input.step);
     return { data: input.schema.parse(data), usage };
   }
@@ -167,6 +169,26 @@ describe("LLM scenario pipeline", () => {
     expect(provider.calls.filter((step) => step === "timeline")).toHaveLength(3);
     expect(provider.calls.filter((step) => step === "truth")).toHaveLength(1);
     expect(provider.calls.filter((step) => step === "characters")).toHaveLength(1);
+  });
+
+  it("stays within the 13-call maximum for a six-player scenario", async () => {
+    const provider = new FixtureProvider({
+      playerCount: 6,
+      invalidTimelineAttempts: 2,
+    });
+    await run(provider, 6);
+    expect(provider.calls).toHaveLength(13);
+  });
+
+  it("does not provide hidden truth fields to the verification call", async () => {
+    const provider = new FixtureProvider();
+    await run(provider);
+    const verificationPrompt = provider.prompts[
+      provider.calls.lastIndexOf("verification")
+    ];
+    expect(verificationPrompt).not.toContain("상속 분쟁");
+    expect(verificationPrompt).not.toContain("독이 든 위스키");
+    expect(verificationPrompt).not.toContain("22:00");
   });
 
   it("does not return a scenario when verification picks another culprit", async () => {
