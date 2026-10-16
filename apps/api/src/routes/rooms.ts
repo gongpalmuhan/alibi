@@ -1,9 +1,12 @@
 import {
   CastVoteInputSchema,
   ChangePhaseInputSchema,
+  CreateRoomFromScenarioInputSchema,
   CreateRoomInputSchema,
+  GenerateRoomInputSchema,
   JoinRoomInputSchema,
   RoomCodeSchema,
+  SelectRoomScenarioInputSchema,
 } from "../../../../packages/shared/src";
 import { Router } from "express";
 
@@ -13,9 +16,16 @@ import {
   castVote,
   changeRoomPhase,
   createRoom,
+  createRoomFromScenario,
   getRoomSnapshot,
   joinRoom,
 } from "../services/room";
+import {
+  assertGenerationAuthorized,
+  createGeneratedRoom,
+  retryGeneration,
+  selectFallbackScenario,
+} from "../services/generation";
 
 const roomsRouter = Router();
 
@@ -79,10 +89,52 @@ const requiredHostTokenFrom = (hostToken: string | undefined): string => {
 
 roomsRouter.post("/", async (request, response, next) => {
   try {
-    const input = parseOrThrow(CreateRoomInputSchema.safeParse(request.body));
-    const result = await createRoom(input);
+    const scenarioInput = CreateRoomFromScenarioInputSchema.safeParse(request.body);
+    const result = scenarioInput.success
+      ? await createRoomFromScenario(scenarioInput.data.scenarioId)
+      : await createRoom(parseOrThrow(CreateRoomInputSchema.safeParse(request.body)));
 
     response.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+roomsRouter.post("/generate", async (request, response, next) => {
+  try {
+    assertGenerationAuthorized(request.get("x-generation-key") ?? undefined);
+    const input = parseOrThrow(GenerateRoomInputSchema.safeParse(request.body));
+    const result = await createGeneratedRoom(input);
+    response.status(202).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+roomsRouter.post("/:code/generation/retry", async (request, response, next) => {
+  try {
+    assertGenerationAuthorized(request.get("x-generation-key") ?? undefined);
+    const code = roomCodeFrom(request.params.code);
+    const result = await retryGeneration(
+      code,
+      requiredHostTokenFrom(request.get("x-host-token") ?? undefined),
+    );
+    response.status(202).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+roomsRouter.post("/:code/scenario", async (request, response, next) => {
+  try {
+    const code = roomCodeFrom(request.params.code);
+    const input = parseOrThrow(SelectRoomScenarioInputSchema.safeParse(request.body));
+    const snapshot = await selectFallbackScenario(
+      code,
+      input,
+      requiredHostTokenFrom(request.get("x-host-token") ?? undefined),
+    );
+    response.json(snapshot);
   } catch (error) {
     next(error);
   }
