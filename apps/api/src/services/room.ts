@@ -116,6 +116,29 @@ const waitBeforeTransactionRetry = async (attempt: number): Promise<void> => {
   });
 };
 
+const withSerializableTransactionRetry = async <T>(
+  operation: () => Promise<T>,
+  failureMessage: string,
+): Promise<T> => {
+  for (let attempt = 0; attempt < VOTE_TRANSACTION_ATTEMPTS; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (
+        isTransactionConflict(error) &&
+        attempt + 1 < VOTE_TRANSACTION_ATTEMPTS
+      ) {
+        await waitBeforeTransactionRetry(attempt);
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new ApiError(500, "INTERNAL_ERROR", failureMessage);
+};
+
 const nextPhaseFor = (phase: Phase): Phase | undefined => {
   const currentIndex = phaseSequence.indexOf(phase);
   return phaseSequence[currentIndex + 1];
@@ -416,8 +439,10 @@ export const assignCharacters = async (
 ): Promise<RoomSnapshot> => {
   const prisma = getPrisma();
 
-  return prisma.$transaction(
-    async (transaction) => {
+  return withSerializableTransactionRetry(
+    () =>
+      prisma.$transaction(
+        async (transaction) => {
       const room = await transaction.room.findUnique({
         where: { code },
         select: {
@@ -509,9 +534,11 @@ export const assignCharacters = async (
         requestingPlayer = { ...player, hasVoted: false };
       }
 
-      return toSnapshot(room, scenario, players.length, requestingPlayer, true);
-    },
-    { isolationLevel: "Serializable" },
+          return toSnapshot(room, scenario, players.length, requestingPlayer, true);
+        },
+        { isolationLevel: "Serializable" },
+      ),
+    "Unable to assign characters.",
   );
 };
 
@@ -523,8 +550,10 @@ export const changeRoomPhase = async (
 ): Promise<RoomSnapshot> => {
   const prisma = getPrisma();
 
-  return prisma.$transaction(
-    async (transaction) => {
+  return withSerializableTransactionRetry(
+    () =>
+      prisma.$transaction(
+        async (transaction) => {
       const room = await transaction.room.findUnique({
         where: { code },
         select: {
@@ -653,17 +682,19 @@ export const changeRoomPhase = async (
             )
           : undefined;
 
-      return toSnapshot(
-        updatedRoom,
-        scenario,
-        await transaction.player.count({ where: { roomId: room.id } }),
-        requestingPlayer,
-        true,
-        voteProgress,
-        voteResults,
-      );
-    },
-    { isolationLevel: "Serializable" },
+          return toSnapshot(
+            updatedRoom,
+            scenario,
+            await transaction.player.count({ where: { roomId: room.id } }),
+            requestingPlayer,
+            true,
+            voteProgress,
+            voteResults,
+          );
+        },
+        { isolationLevel: "Serializable" },
+      ),
+    "Unable to change the room phase.",
   );
 };
 
