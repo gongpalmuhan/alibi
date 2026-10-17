@@ -1,0 +1,19 @@
+# Never copy local credentials or connection metadata into the build context.
+.env
+.env.*
+.neon
+
+# Dependencies and generated artifacts are installed/generated in Docker build stages.
+node_modules
+**/node_modules
+.pnpm-store
+apps/api/generated/prisma
+
+# Local output and editor files are not part of the API image.
+dist
+build
+coverage
+*.log
+.DS_Store
+.idea
+.git
