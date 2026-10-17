@@ -26,6 +26,11 @@ export const getPrisma = (): PrismaClient => {
   return globalForPrisma.prisma;
 };
 
+/** Performs a read-only database round trip for the readiness endpoint. */
+export const checkDatabaseReady = async (): Promise<void> => {
+  await getPrisma().$queryRaw`SELECT 1`;
+};
+
 export const disconnectPrisma = async (): Promise<void> => {
   if (globalForPrisma.prisma) {
     await globalForPrisma.prisma.$disconnect();
